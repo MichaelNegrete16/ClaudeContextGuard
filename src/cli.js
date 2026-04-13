@@ -75,9 +75,18 @@ function cmdCheck() {
     if (ratio === null) process.exit(0);
 
     if (ratio < config.minReadToEditRatio) {
+      const editWord = edits === 1 ? 'edición' : 'ediciones';
       process.stderr.write('\n');
-      process.stderr.write('⚠️  Claude lleva mucho rato trabajando y puede estar perdiendo el hilo.\n');
-      process.stderr.write('    Escribe /compact en el chat para que se ponga al día.\n');
+      process.stderr.write('╔══════════════════════════════════════════════════════╗\n');
+      process.stderr.write('║  ⚠️  Claude está perdiendo el hilo de la conversación  ║\n');
+      process.stderr.write('╠══════════════════════════════════════════════════════╣\n');
+      process.stderr.write(`║  📊 ${edits} ${editWord}, ${reads} lecturas (ratio ${ratio.toFixed(1)}x)`.padEnd(55) + '║\n');
+      process.stderr.write('╠══════════════════════════════════════════════════════╣\n');
+      process.stderr.write('║  Qué hacer ahora:                                    ║\n');
+      process.stderr.write('║                                                      ║\n');
+      process.stderr.write('║  1️⃣  Escribe /compact  → Claude resume y continúa    ║\n');
+      process.stderr.write('║  2️⃣  Escribe /new      → Nueva sesión desde cero     ║\n');
+      process.stderr.write('╚══════════════════════════════════════════════════════╝\n');
       process.stderr.write('\n');
       process.exit(1);
     }

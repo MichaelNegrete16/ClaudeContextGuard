@@ -41,13 +41,19 @@ function writeSettings(settingsPath, settings) {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
 }
 
-function isInstalled(settings) {
-  const postToolUse = settings?.hooks?.PostToolUse;
-  if (!Array.isArray(postToolUse)) return false;
-  return postToolUse.some((entry) => {
+function hasHookCommand(list, command) {
+  if (!Array.isArray(list)) return false;
+  return list.some((entry) => {
     if (!Array.isArray(entry.hooks)) return false;
-    return entry.hooks.some((h) => h.type === 'command' && h.command === HOOK_COMMAND);
+    return entry.hooks.some((h) => h.type === 'command' && h.command === command);
   });
+}
+
+function isInstalled(settings) {
+  return (
+    hasHookCommand(settings?.hooks?.PostToolUse, HOOK_COMMAND) &&
+    hasHookCommand(settings?.hooks?.Stop, HOOK_COMMAND)
+  );
 }
 
 function install() {
@@ -59,46 +65,61 @@ function install() {
   }
 
   if (!settings.hooks) settings.hooks = {};
-  if (!Array.isArray(settings.hooks.PostToolUse)) settings.hooks.PostToolUse = [];
 
-  settings.hooks.PostToolUse.push({
-    matcher: HOOK_MATCHER,
-    hooks: [
-      {
-        type: 'command',
-        command: HOOK_COMMAND,
-      },
-    ],
-  });
+  // PostToolUse hook (Edit|Write)
+  if (!hasHookCommand(settings.hooks.PostToolUse, HOOK_COMMAND)) {
+    if (!Array.isArray(settings.hooks.PostToolUse)) settings.hooks.PostToolUse = [];
+    settings.hooks.PostToolUse.push({
+      matcher: HOOK_MATCHER,
+      hooks: [{ type: 'command', command: HOOK_COMMAND }],
+    });
+  }
+
+  // Stop hook (after every Claude response)
+  if (!hasHookCommand(settings.hooks.Stop, HOOK_COMMAND)) {
+    if (!Array.isArray(settings.hooks.Stop)) settings.hooks.Stop = [];
+    settings.hooks.Stop.push({
+      hooks: [{ type: 'command', command: HOOK_COMMAND }],
+    });
+  }
 
   writeSettings(settingsPath, settings);
   return { alreadyInstalled: false, settingsPath };
+}
+
+function removeHookCommand(list, command) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((entry) => {
+      const filtered = (entry.hooks || []).filter(
+        (h) => !(h.type === 'command' && h.command === command)
+      );
+      if (filtered.length === 0) return null;
+      return Object.assign({}, entry, { hooks: filtered });
+    })
+    .filter(Boolean);
 }
 
 function uninstall() {
   const settingsPath = resolveSettingsPath();
   const settings = readSettings(settingsPath);
 
-  if (!isInstalled(settings)) {
+  const hadPostToolUse = hasHookCommand(settings?.hooks?.PostToolUse, HOOK_COMMAND);
+  const hadStop = hasHookCommand(settings?.hooks?.Stop, HOOK_COMMAND);
+
+  if (!hadPostToolUse && !hadStop) {
     return { wasInstalled: false, settingsPath };
   }
 
-  settings.hooks.PostToolUse = settings.hooks.PostToolUse
-    .map((entry) => {
-      const filtered = (entry.hooks || []).filter(
-        (h) => !(h.type === 'command' && h.command === HOOK_COMMAND)
-      );
-      if (filtered.length === 0) return null;
-      return Object.assign({}, entry, { hooks: filtered });
-    })
-    .filter(Boolean);
+  if (!settings.hooks) settings.hooks = {};
 
-  if (settings.hooks.PostToolUse.length === 0) {
-    delete settings.hooks.PostToolUse;
-  }
-  if (Object.keys(settings.hooks).length === 0) {
-    delete settings.hooks;
-  }
+  settings.hooks.PostToolUse = removeHookCommand(settings.hooks.PostToolUse, HOOK_COMMAND);
+  if (settings.hooks.PostToolUse.length === 0) delete settings.hooks.PostToolUse;
+
+  settings.hooks.Stop = removeHookCommand(settings.hooks.Stop, HOOK_COMMAND);
+  if (settings.hooks.Stop.length === 0) delete settings.hooks.Stop;
+
+  if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
 
   writeSettings(settingsPath, settings);
   return { wasInstalled: true, settingsPath };
