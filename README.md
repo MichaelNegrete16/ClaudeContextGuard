@@ -24,11 +24,19 @@ The result: bugs introduced, working code broken, architectural decisions ignore
 
 Reads the JSONL session files Claude Code already saves in `~/.claude/projects/` and calculates your session's **read-to-edit ratio in real time**.
 
-When the ratio drops below a safe threshold, you get an alert:
+When the ratio drops below a safe threshold, you get an alert after every Claude response or file edit:
 
 ```
-⚠️  Claude lleva mucho rato trabajando y puede estar perdiendo el hilo.
-    Escribe /compact en el chat para que se ponga al día.
+╔══════════════════════════════════════════════════════╗
+║  ⚠️  Claude is losing track of the conversation       ║
+╠══════════════════════════════════════════════════════╣
+║  📊 15 edits, 8 reads (ratio 0.5x)                   ║
+╠══════════════════════════════════════════════════════╣
+║  What to do now:                                     ║
+║                                                      ║
+║  1️⃣  Type /compact  → Claude summarizes and continues ║
+║  2️⃣  Type /new      → Start a fresh session          ║
+╚══════════════════════════════════════════════════════╝
 ```
 
 You can also run it manually at any time:
@@ -40,53 +48,31 @@ claude-context-guard status
 Output when healthy:
 
 ```
-🟢  Claude está trabajando bien en esta sesión.
+🟢  Claude is working well in this session.
 ```
 
 Output when degraded:
 
 ```
-🔴  Claude está perdiendo contexto — puede cometer errores.
+🔴  Claude is losing context — errors may follow.
 
-    → Escribe /compact en el chat para que se ponga al día.
-    → O empieza una sesión nueva si el problema persiste.
+    → Type /compact to bring Claude up to speed.
+    → Or start a new session if the problem persists.
 ```
 
 ---
 
 ## Installation
 
-One command:
+One command — hooks are configured automatically:
 
 ```bash
-npx claude-context-guard install
+npm install -g claude-context-guard
 ```
 
-Installs a background watcher that monitors your active session and alerts when quality drops. Doesn't touch your existing hooks.
+That's it. No extra setup needed. The hook is added to `~/.claude/settings.json` automatically during install.
 
-Manual install (optional):
-
-Add to your `~/.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "npx claude-context-guard check"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Uninstall:
+To remove it:
 
 ```bash
 npx claude-context-guard uninstall
@@ -117,6 +103,10 @@ Tool calls are classified as:
 | Edit | `Edit`, `Write` |
 
 The **read-to-edit ratio** is `reads / edits`. A ratio below 4.0 indicates Claude may be operating with insufficient context.
+
+The check runs automatically in two moments:
+- After every **Edit or Write** tool use (`PostToolUse` hook)
+- After every **Claude response** (`Stop` hook)
 
 ---
 
