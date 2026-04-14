@@ -24,7 +24,25 @@ The result: bugs introduced, working code broken, architectural decisions ignore
 
 Reads the JSONL session files Claude Code already saves in `~/.claude/projects/` and calculates your session's **read-to-edit ratio in real time**.
 
-When the ratio drops below a safe threshold, you get an alert after every Claude response or file edit:
+### Live statusline bar
+
+A color-coded bar appears at the bottom of Claude Code after every response, showing quality and context usage at a glance:
+
+```
+🧠 Quality [██████████] ratio:6.2x  edits:5  reads:31  ·  📦 Context [███░░░░░░░] 30%
+```
+
+The bars change color as the session progresses:
+
+| Color | Meaning |
+|---|---|
+| 🟢 Green | Healthy — Claude is reading enough context |
+| 🟡 Yellow | Starting to degrade — watch out |
+| 🔴 Red + `⚠ /compact` | Degraded — take action now |
+
+### Alert when it gets bad
+
+When the ratio drops below the safe threshold, you also get a full alert after every Claude response or file edit:
 
 ```
 ╔══════════════════════════════════════════════════════╗
@@ -39,25 +57,10 @@ When the ratio drops below a safe threshold, you get an alert after every Claude
 ╚══════════════════════════════════════════════════════╝
 ```
 
-You can also run it manually at any time:
+You can also check manually at any time:
 
 ```bash
 claude-context-guard status
-```
-
-Output when healthy:
-
-```
-🟢  Claude is working well in this session.
-```
-
-Output when degraded:
-
-```
-🔴  Claude is losing context — errors may follow.
-
-    → Type /compact to bring Claude up to speed.
-    → Or start a new session if the problem persists.
 ```
 
 ---
@@ -104,7 +107,8 @@ Tool calls are classified as:
 
 The **read-to-edit ratio** is `reads / edits`. A ratio below 4.0 indicates Claude may be operating with insufficient context.
 
-The check runs automatically in two moments:
+The check runs automatically in three moments:
+- **Statusline** — live bar at the bottom of Claude Code after every response
 - After every **Edit or Write** tool use (`PostToolUse` hook)
 - After every **Claude response** (`Stop` hook)
 
@@ -145,8 +149,9 @@ Usage: claude-context-guard <command>
 Commands:
   status      Show session quality report for current directory
   check       Hook mode: read stdin JSON and alert if degraded
-  install     Add PostToolUse hook to ~/.claude/settings.json
-  uninstall   Remove the hook from ~/.claude/settings.json
+  statusline  Print color progress bar for Claude Code statusline
+  install     Add hooks and statusline to ~/.claude/settings.json
+  uninstall   Remove hooks and statusline from ~/.claude/settings.json
   config      Show current configuration
   help        Show this help message
 ```
@@ -178,10 +183,10 @@ const config = guard.getConfig();
 
 | Before | After |
 |---|---|
-| Claude degrades silently | Real-time alert when quality drops |
+| Claude degrades silently | Live color bar shows quality at all times |
 | Bugs appear out of nowhere | Catch degradation before damage |
 | Wasted time fixing AI-introduced bugs | Know exactly when to reset the session |
-| No visibility into session health | Live read-to-edit ratio |
+| No visibility into session health | Live read-to-edit ratio + context % |
 
 ---
 
