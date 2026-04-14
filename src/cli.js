@@ -125,6 +125,88 @@ function cmdConfig() {
   console.log('');
 }
 
+function cmdStatusline() {
+  // Reads JSON from stdin (Claude Code statusline format) and prints one line.
+  const timeout = setTimeout(() => {
+    process.exit(0);
+  }, 2000);
+  timeout.unref();
+
+  let raw = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (chunk) => { raw += chunk; });
+  process.stdin.on('end', () => {
+    let hookCwd = cwd;
+    let contextPct = null;
+
+    try {
+      const data = JSON.parse(raw);
+      if (data.cwd) hookCwd = data.cwd;
+      if (data.context_window && data.context_window.used_percentage != null) {
+        contextPct = data.context_window.used_percentage;
+      }
+    } catch {
+      // use defaults
+    }
+
+    const config = loadConfig();
+    const result = analyseLatestSession(hookCwd);
+
+    // ── build progress bar ──────────────────────────────────────────────────
+    function makeBar(pct, width, colorFn) {
+      const filled = Math.round((pct / 100) * width);
+      const empty = width - filled;
+      return colorFn('█'.repeat(filled)) + '\x1b[90m' + '░'.repeat(empty) + '\x1b[0m';
+    }
+
+    // ANSI color helpers
+    const green  = (s) => `\x1b[32m${s}\x1b[0m`;
+    const yellow = (s) => `\x1b[33m${s}\x1b[0m`;
+    const red    = (s) => `\x1b[31m${s}\x1b[0m`;
+
+    function ratioColor(ratio, minRatio) {
+      if (ratio === null) return green;
+      const pct = Math.min(ratio / minRatio, 1); // 1.0 = perfect, 0 = fully degraded
+      if (pct >= 0.75) return green;
+      if (pct >= 0.4)  return yellow;
+      return red;
+    }
+
+    // ── ratio bar ───────────────────────────────────────────────────────────
+    let ratioLine = '';
+    if (result) {
+      const { reads, edits, ratio } = result;
+      const colorFn = ratioColor(ratio, config.minReadToEditRatio);
+
+      // ratio as percentage of healthy threshold (capped at 100%)
+      const ratioPct = ratio === null ? 100 : Math.min((ratio / config.minReadToEditRatio) * 100, 100);
+      const bar = makeBar(ratioPct, 10, colorFn);
+
+      const ratioStr = ratio === null ? 'N/A' : `${ratio.toFixed(1)}x`;
+      const label = colorFn(`🧠 Quality`);
+      ratioLine = `${label} [${bar}] ratio:${ratioStr}  edits:${edits}  reads:${reads}`;
+
+      if (ratio !== null && ratio < config.minReadToEditRatio && edits >= config.alertAfterEdits) {
+        ratioLine += '  ' + red('⚠ /compact');
+      }
+    } else {
+      ratioLine = `\x1b[90m🧠 Quality [${makeBar(100, 10, green)}] no data yet\x1b[0m`;
+    }
+
+    // ── context bar ─────────────────────────────────────────────────────────
+    let contextLine = '';
+    if (contextPct !== null) {
+      const ctxColorFn = contextPct < 50 ? green : contextPct < 80 ? yellow : red;
+      const bar = makeBar(contextPct, 10, ctxColorFn);
+      contextLine = `📦 Context [${bar}] ${contextPct}%`;
+    }
+
+    const output = [ratioLine, contextLine].filter(Boolean).join('  ·  ');
+    process.stdout.write(output + '\n');
+    process.exit(0);
+  });
+}
+
 function cmdHelp() {
   console.log('');
   console.log('Usage: claude-context-guard <command>');
@@ -132,8 +214,9 @@ function cmdHelp() {
   console.log('Commands:');
   console.log('  status      Show session quality report for current directory');
   console.log('  check       Hook mode: read stdin JSON and alert if degraded');
-  console.log('  install     Add PostToolUse hook to ~/.claude/settings.json');
-  console.log('  uninstall   Remove the hook from ~/.claude/settings.json');
+  console.log('  statusline  Statusline mode: print one-line quality bar for Claude Code');
+  console.log('  install     Add hooks and statusline to ~/.claude/settings.json');
+  console.log('  uninstall   Remove hooks and statusline from ~/.claude/settings.json');
   console.log('  config      Show current configuration');
   console.log('  help        Show this help message');
   console.log('');
@@ -145,8 +228,9 @@ const command = process.argv[2] || 'help';
 
 switch (command) {
   case 'status':    cmdStatus();    break;
-  case 'check':     cmdCheck();     break;
-  case 'install':   cmdInstall();   break;
+  case 'check':      cmdCheck();      break;
+  case 'statusline': cmdStatusline(); break;
+  case 'install':    cmdInstall();    break;
   case 'uninstall': cmdUninstall(); break;
   case 'config':    cmdConfig();    break;
   case 'help':

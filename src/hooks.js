@@ -15,6 +15,7 @@ const SETTINGS_CANDIDATES = [
 
 const HOOK_COMMAND = 'npx claude-context-guard check';
 const HOOK_MATCHER = 'Edit|Write';
+const STATUSLINE_COMMAND = 'npx claude-context-guard statusline';
 
 function resolveSettingsPath() {
   for (const p of SETTINGS_CANDIDATES) {
@@ -52,7 +53,8 @@ function hasHookCommand(list, command) {
 function isInstalled(settings) {
   return (
     hasHookCommand(settings?.hooks?.PostToolUse, HOOK_COMMAND) &&
-    hasHookCommand(settings?.hooks?.Stop, HOOK_COMMAND)
+    hasHookCommand(settings?.hooks?.Stop, HOOK_COMMAND) &&
+    settings?.statusLine?.command === STATUSLINE_COMMAND
   );
 }
 
@@ -81,6 +83,11 @@ function install() {
     settings.hooks.Stop.push({
       hooks: [{ type: 'command', command: HOOK_COMMAND }],
     });
+  }
+
+  // Statusline
+  if (settings?.statusLine?.command !== STATUSLINE_COMMAND) {
+    settings.statusLine = { type: 'command', command: STATUSLINE_COMMAND };
   }
 
   writeSettings(settingsPath, settings);
@@ -120,6 +127,11 @@ function uninstall() {
   if (settings.hooks.Stop.length === 0) delete settings.hooks.Stop;
 
   if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
+
+  // Remove statusline
+  if (settings?.statusLine?.command === STATUSLINE_COMMAND) {
+    delete settings.statusLine;
+  }
 
   writeSettings(settingsPath, settings);
   return { wasInstalled: true, settingsPath };
