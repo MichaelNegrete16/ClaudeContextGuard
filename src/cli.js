@@ -151,8 +151,25 @@ function cmdStatusline() {
 
     const config = loadConfig();
     const { parseSession } = require('./monitor');
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const CACHE_FILE = path.join(os.homedir(), '.claude', 'context-guard.cache.json');
 
-    // Use transcript_path directly if available — avoids cwd mismatch issues
+    // Persist session data so refreshInterval calls (no stdin) can reuse it
+    if (transcriptPath) {
+      try {
+        fs.writeFileSync(CACHE_FILE, JSON.stringify({ transcriptPath, contextPct }), 'utf8');
+      } catch { /* ignore */ }
+    } else {
+      // Fallback: use last known data from cache
+      try {
+        const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+        if (cached.transcriptPath) transcriptPath = cached.transcriptPath;
+        if (contextPct === null && cached.contextPct != null) contextPct = cached.contextPct;
+      } catch { /* ignore */ }
+    }
+
     let result = null;
     if (transcriptPath) {
       const stats = parseSession(transcriptPath);
@@ -160,34 +177,6 @@ function cmdStatusline() {
         const ratio = stats.edits === 0 ? null : stats.reads / stats.edits;
         result = Object.assign({ ratio, filePath: transcriptPath }, stats);
       }
-    }
-
-    // Fallback: find the most recently modified JSONL across all projects
-    if (!result) {
-      const projectsDir = require('path').join(require('os').homedir(), '.claude', 'projects');
-      try {
-        const fs = require('fs');
-        let newest = null;
-        let newestMtime = 0;
-        for (const proj of fs.readdirSync(projectsDir)) {
-          const projPath = require('path').join(projectsDir, proj);
-          try {
-            for (const f of fs.readdirSync(projPath)) {
-              if (!f.endsWith('.jsonl')) continue;
-              const fp = require('path').join(projPath, f);
-              const mtime = fs.statSync(fp).mtimeMs;
-              if (mtime > newestMtime) { newestMtime = mtime; newest = fp; }
-            }
-          } catch { /* skip */ }
-        }
-        if (newest) {
-          const stats = parseSession(newest);
-          if (stats) {
-            const ratio = stats.edits === 0 ? null : stats.reads / stats.edits;
-            result = Object.assign({ ratio, filePath: newest }, stats);
-          }
-        }
-      } catch { /* no projects dir */ }
     }
 
     // ── build progress bar ──────────────────────────────────────────────────
