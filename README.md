@@ -28,17 +28,19 @@ Monitors Claude Code sessions using **7 degradation signals** with EMA smoothing
 
 ### Live statusline bar
 
-A color-coded bar at the bottom of Claude Code shows your session health at a glance:
+A responsive, color-coded bar at the bottom of Claude Code shows your session health at a glance. It adapts to your terminal width:
 
 ```
-🧠 Quality [████████░░] 82/100  ratio:5.2x  ·  📦 Context [███░░░░░░░] 30%  ·  🌿 main  ·  📁 my-project
+🧠 Quality [████████░░] 82/100  ·  ratio:5.2x  ·  📦 Context [███░░░░░░░] 30%  ·  🌿 main  ·  📁 my-project
 ```
 
 When things start to degrade, extra indicators appear:
 
 ```
-🧠 Quality [███░░░░░░░] 28/100  ratio:1.2x  blind:5 thrash:2 writes:3  ⚠ /compact  ·  📦 Context [███████░░░] 68%  ·  🌿 feat/auth  ·  📁 my-project
+🧠 Quality [███░░░░░░░] 28/100  ⚠ /compact  ·  ratio:1.2x  ·  blind:5 thrash:2 writes:3  ·  📦 Context [███████░░░] 68%  ·  🌿 feat/auth  ·  📁 my-project
 ```
+
+On narrow terminals, labels shorten and lines wrap automatically.
 
 | Color | Score | Meaning |
 |---|---|---|
